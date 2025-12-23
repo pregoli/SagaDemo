@@ -1,0 +1,97 @@
+###############################################################################
+# SagaDemo - Order Processing Saga Test Scenarios
+# 
+# Flow:
+# 1. API sends SubmitOrder COMMAND to saga queue (via outbox)
+# 2. Saga receives command, stores order data, sends ReserveStock
+# 3. ReserveStock consumer → StockReserved event
+# 4. Saga sends ProcessPayment
+# 5. ProcessPayment consumer → PaymentCompleted/PaymentFailed
+# 6. Success: ArrangeShipping → OrderCompleted
+# 7. Failure: ReleaseStock (compensation) → OrderFailed
+#
+###############################################################################
+
+@baseUrl = http://localhost:5000
+
+###############################################################################
+# Health Check
+###############################################################################
+
+### Check API Health
+GET {{baseUrl}}/health
+
+###############################################################################
+# Create Order - Sends SubmitOrder Command to Saga
+###############################################################################
+
+### Create Order
+# @name createOrder
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+    "customerEmail": "john.doe@example.com",
+    "productName": "MacBook Pro 16",
+    "quantity": 1,
+    "totalAmount": 2499.99
+}
+
+### Get Order Status
+@orderId = {{createOrder.response.body.orderId}}
+GET {{baseUrl}}/orders/{{orderId}}
+
+### Get Saga State
+@correlationId = {{createOrder.response.body.correlationId}}
+GET {{baseUrl}}/sagas/{{correlationId}}
+
+###############################################################################
+# View Outbox Messages
+###############################################################################
+
+### Check Outbox
+GET {{baseUrl}}/outbox
+
+###############################################################################
+# Multiple Orders
+###############################################################################
+
+### Order 1
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+    "customerEmail": "alice@example.com",
+    "productName": "iPhone 15 Pro",
+    "quantity": 1,
+    "totalAmount": 1199.00
+}
+
+### Order 2
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+    "customerEmail": "bob@example.com",
+    "productName": "USB-C Cable",
+    "quantity": 3,
+    "totalAmount": 29.99
+}
+
+### Order 3
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+    "customerEmail": "carol@example.com",
+    "productName": "Gaming PC",
+    "quantity": 1,
+    "totalAmount": 3500.00
+}
+
+###############################################################################
+# Query All Orders
+###############################################################################
+
+### Get All Orders
+GET {{baseUrl}}/orders
